@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="1.0.0">
+<meta name="app-version" content="1.1.0">
 <title>Zambia ISP Tracker</title>
 <style>
   :root{
@@ -133,11 +133,17 @@
   .pill.estimated{background:rgba(232,185,63,.15);color:var(--yellow);border-color:rgba(232,185,63,.35);}
   .pill.unconfirmed{background:rgba(92,107,128,.18);color:var(--grey);border-color:rgba(92,107,128,.4);}
 
+  /* Auto-height expand/collapse via CSS grid (0fr -> 1fr): sizes to whatever the
+     content actually needs on any device, instead of clipping anything past a fixed
+     pixel cap (a fixed max-height used to silently cut off the bottom of tall detail
+     panels — e.g. the submit button below a long rating form — with no way to reach
+     the clipped part, since overflow was hidden and it wasn't just a page-scroll issue). */
   .detail{
-    max-height:0;overflow:hidden;transition:max-height .3s ease;
+    display:grid;grid-template-rows:0fr;overflow:hidden;transition:grid-template-rows .3s ease;
   }
-  .row.open .detail{max-height:1200px;margin-top:12px;}
+  .row.open .detail{grid-template-rows:1fr;margin-top:12px;}
   .detail-inner{
+    min-height:0;overflow:hidden;
     border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:#c3cddb;line-height:1.55;
   }
   .detail-inner .src{color:var(--muted);font-size:12px;margin-top:8px;display:block;}
@@ -387,7 +393,8 @@
     .row{border:1px solid #ccc;break-inside:avoid;}
     .pill{border:1px solid #999;}
     .caret{display:none;}
-    .row .detail{max-height:none!important;margin-top:8px!important;}
+    .row .detail{grid-template-rows:1fr!important;margin-top:8px!important;}
+    .row .detail-inner{overflow:visible!important;}
     .qos-actions,.rate-form,.impact-form-card,.status-report-form,.speed-report-form{display:none!important;}
   }
 </style>
@@ -527,6 +534,7 @@
         <div class="loc-row" style="margin-top:12px;">
           <button class="btn small" id="impactLocBtn" type="button">📍 <span id="impactLocLabel">Use my location</span></button>
           <select class="city-select" id="impactCitySelect"><option value="">…</option></select>
+          <select class="city-select" id="impactAreaSelect"><option value="">…</option></select>
         </div>
         <div class="loc-status" id="impactLocStatus"></div>
         <textarea class="comment-box" id="impactComment" maxlength="500" style="margin-top:10px;" placeholder="Optional: tell us more…"></textarea>
@@ -593,7 +601,7 @@
       <span class="matokipedo-tagline">Live infrastructure monitoring by Matokipedo</span>
     </div>
     <span class="reset-link" id="resetQos">refresh / reset local data</span>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;">v1.0.0 &middot; <a href="CHANGELOG.md" style="color:inherit;">changelog</a></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">v1.1.0 &middot; <a href="CHANGELOG.md" style="color:inherit;">changelog</a></div>
   </footer>
 </div>
 
@@ -830,6 +838,8 @@ const I18N = {
     your_rating: "Your rating",
     btn_use_location: "Use my location",
     city_manual: "…or choose city manually",
+    area_manual: "Area / suburb (optional)",
+    area_none: "Whole city / not sure",
     comment_placeholder: "Optional: describe your experience (speed, reliability, outages)…",
     btn_submit_rating: "Submit rating",
     no_ratings_yet: "No ratings yet",
@@ -1279,6 +1289,40 @@ const CITIES = [
   {name:"Solwezi", lat:-12.1836, lon:26.3899},
   {name:"Choma", lat:-16.8144, lon:26.9893}
 ];
+
+/* Per-city sourcing notes (area/suburb data), for the record:
+   - Lusaka: Strong coverage. Combined the main Lusaka Wikipedia article, an older/mirrored revision of that article (via a Wikipedia-content aggregator, primidi.com) listing ~65 named suburbs and compounds, individual Wikipedia articles for specific compounds (Kabwata, Kalingalinga, Matero, Garden Township), and an academic conference presentation on informal settlements in Lusaka by Patrick Lamson-Hall for the International Growth Centre (theigc.org), which independently named many of the same compounds (Kanyama, Chawama, Bauleni, Kalingalinga, Chazanga, John Laing, Mtendere, Ng'ombe, Chunga, Mandevu, etc.), giving strong cross-source corroboration. Excluded a handful of unverifiable fragments from the mirror page ('Kwa Shadreck', 'Kwa George', 'Ziwa Zakho', 'Shang'ombo' [which duplicates the name of an unrelated Western Province district] and 'NIPA') as unverifiable/low-quality, and excluded 'Chilanga' because it is a separate district/town south of Lusaka, not a city compound. High confidence overall given the volume of independent corroboration; individual smaller informal compounds have lower confidence than the well-known named suburbs.
+   - Kitwe: Reasonable coverage from the main Kitwe Wikipedia article, which explicitly lists the city's constituent townships/suburbs in one sentence, plus a separate mention of Kawama (site of a school construction project). This is a single-source list (no independent cross-check found), so treat as medium confidence, though the names are consistent with well-known Copperbelt mining-town township naming (Nkana East/West, Wusakile, Mindolo are historically documented ZCCM mine townships).
+   - Ndola: Reasonable coverage, sourced entirely from the main Ndola, Zambia Wikipedia article, which lists 21 residential areas (several with attached schools, suggesting genuine local detail rather than a vandalism dump). No independent second source was found to cross-verify the full list, so confidence is medium; well-known names among them (Kansenshi, Chifubu, Northrise, Twapia) are independently attested in real-estate and news sources.
+   - Kabwe: Reasonable coverage, but concentrated on lead-contamination-affected townships because Kabwe's documentation is dominated by lead-mining pollution research. Sourced from a Human Rights Watch report ('We Have to Be Worried', 2019) and a University of Zambia academic journal article (Journal of Agricultural and Biomedical Sciences) on soil lead contamination, both of which independently name overlapping townships (Makululu, Kasanda, Katondo, Chowa). High confidence for the townships listed; Kabwe likely has additional ordinary residential areas not covered by this pollution-focused literature, so the list should not be read as exhaustive.
+   - Chingola: Thin coverage, as expected for a smaller Copperbelt town. Nchanga North confirmed via the main Chingola Wikipedia article (location of Nchanga Stadium); Chiwempala confirmed via multiple 2012-2026 news reports (Lusaka Times, News Diggers, Kalemba) describing riots/unrest there; Kasompe confirmed via Lusaka Times coverage of a 2022 demolition controversy and the existence of 'Kasompe Airport' on Wikipedia. No official council document was found listing all Chingola townships.
+   - Mufulira: Thin coverage. The main Mufulira Wikipedia article names no residential areas at all. Kankoyo confirmed via its own Wikipedia article (a mine-adjacent township known for sulphur dioxide pollution); Kantanshi confirmed via the Wikipedia constituency article as covering central Mufulira; Kamuchanga confirmed as a named locality (police post) via Mapcarta. Low-to-medium confidence, short list reflects genuinely sparse available documentation rather than padding.
+   - Livingstone: Reasonable coverage for a smaller city, anchored by an official UN-Habitat 'Zambia: Livingstone City Profile' document, which names six settlements formally recognized or targeted for upgrading by Livingstone City Council under the Housing (Statutory and Improvement Areas) Act (Mwandi, Nakatindi, Zambezi Sawmills, Malota, Libuyu, Sakubita) — a genuine official/planning source. Added Maramba (the historic African township, per the main Livingstone Wikipedia article), Linda (confirmed via the Wikipedia article for Linda Secondary School, located in Livingstone), and Dambwa (confirmed via an independent map listing of 'Dambwa Central Market'). Medium-to-high confidence given the official document.
+   - Chipata: Moderate coverage but lower confidence: sourced from an uncited bullet-list section in the main Chipata Wikipedia article naming 33-34 areas, including some colloquial/slang-sounding names (e.g. 'Little Bombay', 'Old Gym', 'Hollywood', 'Aslot', 'Gash') that could not be independently verified. Spot-checked several names against independent sources and found strong corroboration for the more notable ones: Kapata (a well-documented market area, confirmed via multiple independent sites including TripTap and Evendo), Msekera (a genuine agricultural research station location, confirmed via CGIAR/CIMMYT), and Gondar Barracks (a genuine Zambia Army barracks in Chipata, confirmed via Zambia Army social media posts). Given this partial independent verification, the full list was kept (one duplicate 'Hillview' entry in the source removed), but it should be treated as medium confidence overall since the underlying Wikipedia section itself is uncited.
+   - Kasama: Reasonable coverage, sourced from the main Kasama, Zambia Wikipedia article, which explicitly separates named residential compounds inside vs. outside the district council boundary. Partially cross-verified via an independent Facebook community post naming 'Central town, Chikumanino, New town, Location and Mulenga Hills' as Kasama suburbs, matching five of the Wikipedia entries. The remaining, more obscure compound names (e.g. 'Lua Luo', 'Soft Katongo', 'Winberg') could not be independently corroborated, so treat those as lower confidence than the core five.
+   - Solwezi: Thin coverage, as expected for a smaller, newer mining town. Kansanshi and Kyawama confirmed via a Zambian real-estate firm's Solwezi area profile (Property Partners Zambia); Kimasala independently confirmed via Zambian government sources (Ministry of Infrastructure, Housing and Urban Development; Solwezi Municipal Council) referencing the 'Kimasala-Mushitala Bridge'; Kimiteto is from the same real-estate profile only and has lower confidence. Deliberately excluded 'Kalumbila' and 'Mutanda' from the same source, since these are separate towns/districts near Solwezi rather than Solwezi city compounds. No Wikipedia article or council document listing Solwezi's residential areas was found.
+   - Choma: No sub-city area data found despite multiple search strategies (Wikipedia city/district/constituency articles, council site, news outlets, academic sources). The main Choma, Zambia Wikipedia article and Choma (constituency) article mention only landmarks (the museum, a market) and administrative boundaries, not named residential compounds/suburbs. Left empty rather than guessing or padding with unverified names.
+*/
+const AREAS = {
+  "Lusaka": ["Woodlands", "Ibex Hill", "Rhodes Park", "Makeni", "Kalingalinga", "Kamwala", "Kamwala South", "New Kamwala", "Kabwata", "Olympia Park", "Olympia Extension", "Roma", "Fairview", "Northmead", "Chilenje", "New Chilenje", "Chilenje South", "Matero", "Matero North", "Matero East", "Libala", "Cathedral Hill", "Ridgeway", "Handsworth Park", "Sunningdale", "Kabulonga", "Jesmondine", "Acacia Park", "Kalundu", "Chelston", "Avondale", "Prospect Hill", "Longacres", "Chainama Hills", "State Lodge", "Emmasdale", "Leopards Hill", "New Kasama", "Chalala", "Mass Media", "Marshlands", "Manda Hill", "Chainda", "Chudleigh", "Mwembeshi", "Barlastone Park", "Foxdale", "Madras", "Mapepe", "Lilayi", "Presidential Housing Initiative (PHI)", "Nyumba Yanga", "Thorn Park", "Twinpalm", "Villa Elizabetha", "Misisi", "Mtendere", "Mtendere East", "Chaisa", "Chawama", "John Laing", "Chipata Compound", "Ng'ombe", "Lilanda", "Chunga", "Mandevu", "Marapodi", "Garden Township", "Bauleni", "Helen Kaunda", "Kaunda Square", "Kuku", "Frank", "Kanyama", "Kamanga", "Kabanana", "Chazanga", "Jack", "Kalikiliki", "George", "John Howard"],
+  "Kitwe": ["Parklands", "Riverside", "Buchi", "Chimwemwe", "Kwacha", "Nkana East", "Nkana West", "Garneton", "Ndeke", "Miseshi", "Wusakile", "Mindolo", "Chachacha", "Race Course", "Kawama"],
+  "Ndola": ["Bwana Mkubwa", "Chifubu", "Chipulukusu", "Dola Hill", "Hillcrest", "Itawa", "Kabushi", "Kaloko", "Kanini", "Kansenshi", "Kawama", "Lubuto", "Masala", "Minsundu", "Mitengo", "Mushili", "Ndeke", "Northrise", "Nkwazi", "Pamodzi", "Twapia"],
+  "Kabwe": ["Makululu", "Kasanda", "Katondo", "Mahatma Gandhi", "Chowa", "Makandanyama", "Mutwe Wansofu", "Waya", "Railway", "Luangwa"],
+  "Chingola": ["Nchanga North", "Chiwempala", "Kasompe"],
+  "Mufulira": ["Kankoyo", "Kantanshi", "Kamuchanga"],
+  "Livingstone": ["Maramba", "Linda", "Dambwa", "Mwandi", "Nakatindi", "Zambezi Sawmills", "Malota", "Libuyu", "Sakubita"],
+  "Chipata": ["Kapata", "Kalongwezi", "Kalongwezi Extension", "Umodzi", "Moth", "Muchini", "Nabvutika", "Little Bombay", "Mchenga", "Damview", "Old Gym", "New Gym", "Chimwemwe", "Magazine", "Eastrise", "Walela", "Chawama", "Munga", "Chipata Motel", "Nadalitsika", "Katopola", "Maferendum", "Rose", "Hillview", "Gash", "Msekera", "Messengers", "David Kaunda", "Hollywood", "Kalongola Site and Service", "Chimzere", "Gondar Barracks", "Highlands", "Aslot"],
+  "Kasama": ["Central Town", "New Town (Mbulo)", "Location", "Mukulumpe", "Chikumanino", "Mulenga Hills", "Jazz", "Tazara", "Misamfu", "Milima", "Chiba", "Chitamba", "Brown", "Winberg", "Kasama Village", "Kungu", "Mutale/Milenge", "Chisanga", "Soft Katongo", "Lua Luo"],
+  "Solwezi": ["Kansanshi", "Kyawama", "Kimasala", "Kimiteto"],
+  "Choma": []
+};
+function areasForCity(cityName){ return AREAS[cityName] || []; }
+function areaOptionsHtml(cityName){
+  const areas = areasForCity(cityName);
+  const noneLabel = t("area_none");
+  if(!areas.length) return `<option value="">${t("area_manual")}</option>`;
+  return `<option value="">${noneLabel}</option>` + areas.map(a=>`<option value="${a}">${a}</option>`).join("");
+}
 
 const DAY = 24*60*60*1000;
 const nowTs = Date.now();
@@ -1743,7 +1787,7 @@ async function submitReport(report){
     try{
       const { error } = await supa.from("qos_reports").insert([{
         site: SITE_ID,
-        isp: report.isp, stars: report.stars, city: report.city, comment: report.comment,
+        isp: report.isp, stars: report.stars, city: report.city, area: report.area || null, comment: report.comment,
         device_id: SpamGuard.deviceId()
       }]);
       if(error) throw error;
@@ -1802,7 +1846,7 @@ async function submitStatus(entry){
     try{
       const { error } = await supa.from("status_reports").insert([{
         site: SITE_ID,
-        isp: entry.isp, city: entry.city, status: entry.status, comment: entry.comment,
+        isp: entry.isp, city: entry.city, area: entry.area || null, status: entry.status, comment: entry.comment,
         device_id: SpamGuard.deviceId()
       }]);
       if(error) throw error;
@@ -1824,7 +1868,7 @@ async function submitSpeed(entry){
   if(supa){
     const baseRow = {
       site: SITE_ID,
-      isp: entry.isp, city: entry.city, download_mbps: entry.download_mbps, upload_mbps: entry.upload_mbps, comment: entry.comment,
+      isp: entry.isp, city: entry.city, area: entry.area || null, download_mbps: entry.download_mbps, upload_mbps: entry.upload_mbps, comment: entry.comment,
       device_id: SpamGuard.deviceId()
     };
     // Richer columns from the built-in automatic speed test (v1.1.0+). If the
@@ -1870,7 +1914,7 @@ async function submitConversion(entry){
     try{
       const { error } = await supa.from("conversions").insert([{
         site: SITE_ID,
-        to_isp: entry.to_isp, from_isp: entry.from_isp, reasons: entry.reasons, city: entry.city, comment: entry.comment,
+        to_isp: entry.to_isp, from_isp: entry.from_isp, reasons: entry.reasons, city: entry.city, area: entry.area || null, comment: entry.comment,
         device_id: SpamGuard.deviceId()
       }]);
       if(error) throw error;
@@ -1961,6 +2005,8 @@ function applyStaticTranslations(){
 
   const impactCitySelect = document.getElementById("impactCitySelect");
   impactCitySelect.innerHTML = `<option value="">${t("city_manual")}</option>` + CITIES.map(c=>`<option value="${c.name}">${c.name}</option>`).join("");
+  const impactAreaSelectInit = document.getElementById("impactAreaSelect");
+  if(impactAreaSelectInit && impactAreaSelectInit.options.length <= 1) impactAreaSelectInit.innerHTML = areaOptionsHtml(impactCitySelect.value);
 
   document.getElementById("simpleModeLabel").textContent = document.body.classList.contains("simple-mode") ? t("simple_mode_on") : t("simple_mode_off");
 
@@ -2269,6 +2315,9 @@ function renderList(){
                   <option value="">${t("city_manual")}</option>
                   ${CITIES.map(c=>`<option value="${c.name}">${c.name}</option>`).join("")}
                 </select>
+                <select class="city-select" data-role="statusAreaSelect">
+                  <option value="">${t("area_manual")}</option>
+                </select>
               </div>
               <div class="loc-status" data-role="statusLocStatus"></div>
               <textarea class="comment-box" data-role="statusCommentBox" maxlength="500" placeholder="${t("comment_placeholder")}"></textarea>
@@ -2308,6 +2357,9 @@ function renderList(){
                   <option value="">${t("city_manual")}</option>
                   ${CITIES.map(c=>`<option value="${c.name}">${c.name}</option>`).join("")}
                 </select>
+                <select class="city-select" data-role="speedAreaSelect">
+                  <option value="">${t("area_manual")}</option>
+                </select>
               </div>
               <div class="loc-status" data-role="speedLocStatus"></div>
               <textarea class="comment-box" data-role="speedCommentBox" maxlength="500" placeholder="${t("comment_placeholder")}"></textarea>
@@ -2338,6 +2390,9 @@ function renderList(){
                 <select class="city-select" data-role="citySelect">
                   <option value="">${t("city_manual")}</option>
                   ${CITIES.map(c=>`<option value="${c.name}">${c.name}</option>`).join("")}
+                </select>
+                <select class="city-select" data-role="areaSelect">
+                  <option value="">${t("area_manual")}</option>
                 </select>
               </div>
               <div class="loc-status" data-role="locStatus"></div>
@@ -2393,6 +2448,7 @@ function renderList(){
     const locBtn = rowEl.querySelector('[data-role="locBtn"]');
     const locStatus = rowEl.querySelector('[data-role="locStatus"]');
     const citySelect = rowEl.querySelector('[data-role="citySelect"]');
+    const areaSelect = rowEl.querySelector('[data-role="areaSelect"]');
 
     locBtn.addEventListener("click",(e)=>{
       e.stopPropagation();
@@ -2406,6 +2462,8 @@ function renderList(){
         const { city, distanceKm } = nearestCity(latitude, longitude);
         rateForm.dataset.city = city;
         citySelect.value = city;
+        delete rateForm.dataset.area;
+        if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(city);
         locStatus.textContent = "📍 Nearest tracked city: "+city+" (~"+distanceKm+" km away)";
       }, err=>{
         locStatus.textContent = "Couldn't get your location (" + err.message + ") — pick a city manually.";
@@ -2415,6 +2473,14 @@ function renderList(){
     citySelect.addEventListener("click", (e)=> e.stopPropagation());
     citySelect.addEventListener("change",(e)=>{
       rateForm.dataset.city = citySelect.value;
+      delete rateForm.dataset.area;
+      if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(citySelect.value);
+    if(areaSelect){
+      areaSelect.addEventListener("click", (e)=> e.stopPropagation());
+      areaSelect.addEventListener("change",(e)=>{
+        rateForm.dataset.area = areaSelect.value;
+      });
+    }
       locStatus.textContent = citySelect.value ? "City set to "+citySelect.value : "";
     });
 
@@ -2441,8 +2507,9 @@ function renderList(){
         return;
       }
       const city = rateForm.dataset.city || "Unknown";
+      const area = rateForm.dataset.area || null;
       const phone = (phoneInput.value||"").trim();
-      submitReport({ isp:name, stars, comment:(commentBox.value||"").trim(), city, ts: Date.now() });
+      submitReport({ isp:name, stars, comment:(commentBox.value||"").trim(), city, area, ts: Date.now() });
       if(phone) upsertCustomer(phone, detectIspFromPhone(phone));
       phoneInput.value = ""; phoneHint.textContent = "";
     });
@@ -2482,6 +2549,7 @@ function renderList(){
     const statusLocBtn = rowEl.querySelector('[data-role="statusLocBtn"]');
     const statusLocStatus = rowEl.querySelector('[data-role="statusLocStatus"]');
     const statusCitySelect = rowEl.querySelector('[data-role="statusCitySelect"]');
+    const statusAreaSelect = rowEl.querySelector('[data-role="statusAreaSelect"]');
 
     statusLocBtn.addEventListener("click",(e)=>{
       e.stopPropagation();
@@ -2495,6 +2563,8 @@ function renderList(){
         const { city, distanceKm } = nearestCity(latitude, longitude);
         statusForm.dataset.city = city;
         statusCitySelect.value = city;
+        delete statusForm.dataset.area;
+        if(statusAreaSelect) statusAreaSelect.innerHTML = areaOptionsHtml(city);
         statusLocStatus.textContent = "📍 Nearest tracked city: "+city+" (~"+distanceKm+" km away)";
       }, err=>{
         statusLocStatus.textContent = "Couldn't get your location (" + err.message + ") — pick a city manually.";
@@ -2504,6 +2574,14 @@ function renderList(){
     statusCitySelect.addEventListener("click", (e)=> e.stopPropagation());
     statusCitySelect.addEventListener("change",(e)=>{
       statusForm.dataset.city = statusCitySelect.value;
+      delete statusForm.dataset.area;
+      if(statusAreaSelect) statusAreaSelect.innerHTML = areaOptionsHtml(statusCitySelect.value);
+    if(statusAreaSelect){
+      statusAreaSelect.addEventListener("click", (e)=> e.stopPropagation());
+      statusAreaSelect.addEventListener("change",(e)=>{
+        statusForm.dataset.area = statusAreaSelect.value;
+      });
+    }
       statusLocStatus.textContent = statusCitySelect.value ? "City set to "+statusCitySelect.value : "";
     });
 
@@ -2519,7 +2597,8 @@ function renderList(){
         return;
       }
       const city = statusForm.dataset.city || "Unknown";
-      submitStatus({ isp:name, city, status, comment:(statusCommentBox.value||"").trim(), ts: Date.now() });
+      const area = statusForm.dataset.area || null;
+      submitStatus({ isp:name, city, area, status, comment:(statusCommentBox.value||"").trim(), ts: Date.now() });
       statusForm.dataset.status = "";
       statusChoices.querySelectorAll(".status-choice").forEach(b=>b.classList.remove("active"));
       statusCommentBox.value = "";
@@ -2540,6 +2619,7 @@ function renderList(){
     const speedLocBtn = rowEl.querySelector('[data-role="speedLocBtn"]');
     const speedLocStatus = rowEl.querySelector('[data-role="speedLocStatus"]');
     const speedCitySelect = rowEl.querySelector('[data-role="speedCitySelect"]');
+    const speedAreaSelect = rowEl.querySelector('[data-role="speedAreaSelect"]');
 
     speedLocBtn.addEventListener("click",(e)=>{
       e.stopPropagation();
@@ -2553,6 +2633,8 @@ function renderList(){
         const { city, distanceKm } = nearestCity(latitude, longitude);
         speedForm.dataset.city = city;
         speedCitySelect.value = city;
+        delete speedForm.dataset.area;
+        if(speedAreaSelect) speedAreaSelect.innerHTML = areaOptionsHtml(city);
         speedLocStatus.textContent = "📍 Nearest tracked city: "+city+" (~"+distanceKm+" km away)";
       }, err=>{
         speedLocStatus.textContent = "Couldn't get your location (" + err.message + ") — pick a city manually.";
@@ -2562,6 +2644,14 @@ function renderList(){
     speedCitySelect.addEventListener("click", (e)=> e.stopPropagation());
     speedCitySelect.addEventListener("change",(e)=>{
       speedForm.dataset.city = speedCitySelect.value;
+      delete speedForm.dataset.area;
+      if(speedAreaSelect) speedAreaSelect.innerHTML = areaOptionsHtml(speedCitySelect.value);
+    if(speedAreaSelect){
+      speedAreaSelect.addEventListener("click", (e)=> e.stopPropagation());
+      speedAreaSelect.addEventListener("change",(e)=>{
+        speedForm.dataset.area = speedAreaSelect.value;
+      });
+    }
       speedLocStatus.textContent = speedCitySelect.value ? "City set to "+speedCitySelect.value : "";
     });
 
@@ -2592,10 +2682,11 @@ function renderList(){
         return;
       }
       const city = speedForm.dataset.city || "Unknown";
+      const area = speedForm.dataset.area || null;
       let extra = {};
       try{ extra = rowEl.dataset.speedExtra ? JSON.parse(rowEl.dataset.speedExtra) : {}; }catch(parseErr){}
       submitSpeed({
-        isp:name, city, download_mbps: downloadVal, upload_mbps: uploadVal,
+        isp:name, city, area, download_mbps: downloadVal, upload_mbps: uploadVal,
         comment:(speedCommentBox.value||"").trim(), ts: Date.now(),
         test_method: extra.test_method || "manual",
         latency_idle_ms: extra.latency_idle_ms ?? null,
@@ -2869,6 +2960,7 @@ document.getElementById("suggestSubmitBtn").addEventListener("click", ()=>{
 document.getElementById("impactLocBtn").addEventListener("click", ()=>{
   const status = document.getElementById("impactLocStatus");
   const citySelect = document.getElementById("impactCitySelect");
+  const areaSelect = document.getElementById("impactAreaSelect");
   if(!navigator.geolocation){
     status.textContent = "Geolocation isn't supported here — pick a city manually.";
     return;
@@ -2878,6 +2970,9 @@ document.getElementById("impactLocBtn").addEventListener("click", ()=>{
     const { latitude, longitude } = pos.coords;
     const { city, distanceKm } = nearestCity(latitude, longitude);
     citySelect.value = city;
+    // Geolocation only ever resolves to a tracked city, never an area — the tester
+    // still picks their own area/suburb by hand (or leaves it blank).
+    if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(city);
     status.textContent = "📍 Nearest tracked city: "+city+" (~"+distanceKm+" km away)";
   }, err=>{
     status.textContent = "Couldn't get your location (" + err.message + ") — pick a city manually.";
@@ -2909,6 +3004,11 @@ document.getElementById("impactPhone").addEventListener("input", ()=>{
 document.getElementById("impactSubmitBtn").addEventListener("click", ()=>{
   const toIsp = document.getElementById("impactToIsp").value;
   const fromIsp = document.getElementById("impactFromIsp").value || null;
+  document.getElementById("impactCitySelect").addEventListener("change", ()=>{
+  const areaSelect = document.getElementById("impactAreaSelect");
+  if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(document.getElementById("impactCitySelect").value);
+});
+
   const city = document.getElementById("impactCitySelect").value || "Unknown";
   const comment = document.getElementById("impactComment").value.trim();
   const reasons = Array.from(document.querySelectorAll('[data-role="reasonCheck"]:checked')).map(el=>el.value);
@@ -2916,7 +3016,8 @@ document.getElementById("impactSubmitBtn").addEventListener("click", ()=>{
   const phone = document.getElementById("impactPhone").value.trim();
   if(!toIsp){ status.textContent = "Please choose which ISP you switched to / signed up with."; return; }
   if(!phone || !isValidPhone(phone)){ status.textContent = t("phone_required_note"); return; }
-  submitConversion({ to_isp: toIsp, from_isp: fromIsp, reasons, city, comment, ts: Date.now() });
+  const area = document.getElementById("impactAreaSelect").value || null;
+  submitConversion({ to_isp: toIsp, from_isp: fromIsp, reasons, city, area, comment, ts: Date.now() });
   upsertCustomer(phone, detectIspFromPhone(phone));
   document.getElementById("impactComment").value = "";
   document.getElementById("impactPhone").value = "";
