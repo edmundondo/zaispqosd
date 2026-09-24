@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="1.3.0">
+<meta name="app-version" content="1.4.0">
 <title>Zambia ISP Tracker</title>
 <style>
   :root{
@@ -611,7 +611,7 @@
       <span class="matokipedo-tagline">Live infrastructure monitoring by Matokipedo</span>
     </div>
     <span class="reset-link" id="resetQos">refresh / reset local data</span>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;">v1.3.0 &middot; <a href="CHANGELOG.md" style="color:inherit;">changelog</a></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">v1.4.0 &middot; <a href="CHANGELOG.md" style="color:inherit;">changelog</a></div>
   </footer>
 </div>
 
@@ -929,6 +929,7 @@ const I18N = {
     speed_auto_unsupported: "Automatic testing isn't supported in this browser — enter your numbers manually below.",
     speed_auto_loading: "Loading the speed test tool…",
     speed_auto_load_failed: "Couldn't load the automatic speed test (network or ad-blocker issue) — enter your numbers manually below.",
+    speed_auto_progress: "Measuring… ↓ {down} Mbps · ↑ {up} Mbps so far",
     speed_auto_failed: "Couldn't complete the automatic test — enter your numbers manually below.",
     speed_method_auto: "Automatic",
     speed_method_manual: "Manual"
@@ -1073,6 +1074,14 @@ const TRANSLATABLE_KEYS = Object.keys(I18N.en);
 
 let currentLang = "en";
 try{ currentLang = localStorage.getItem("zm_isp_lang") || "en"; }catch(e){}
+// ?lang=xx (used by the Lite pages' "full tracker" links) wins over the remembered choice.
+try{
+  const qLang = new URLSearchParams(location.search).get("lang");
+  if(qLang && Object.prototype.hasOwnProperty.call(I18N, qLang)){
+    currentLang = qLang;
+    try{ localStorage.setItem(SITE_ID + "_isp_lang", currentLang); }catch(e){}
+  }
+}catch(e){}
 let translationOverrides = {};
 
 function t(key){
@@ -1312,15 +1321,15 @@ const CITIES = [
 ];
 
 /* Per-city sourcing notes (area/suburb data), for the record:
-   - Lusaka: Strong coverage. Combined the main Lusaka Wikipedia article, an older/mirrored revision of that article (via a Wikipedia-content aggregator, primidi.com) listing ~65 named suburbs and compounds, individual Wikipedia articles for specific compounds (Kabwata, Kalingalinga, Matero, Garden Township), and an academic conference presentation on informal settlements in Lusaka by Patrick Lamson-Hall for the International Growth Centre (theigc.org), which independently named many of the same compounds (Kanyama, Chawama, Bauleni, Kalingalinga, Chazanga, John Laing, Mtendere, Ng'ombe, Chunga, Mandevu, etc.), giving strong cross-source corroboration. Excluded a handful of unverifiable fragments from the mirror page ('Kwa Shadreck', 'Kwa George', 'Ziwa Zakho', 'Shang'ombo' [which duplicates the name of an unrelated Western Province district] and 'NIPA') as unverifiable/low-quality, and excluded 'Chilanga' because it is a separate district/town south of Lusaka, not a city compound. High confidence overall given the volume of independent corroboration; individual smaller informal compounds have lower confidence than the well-known named suburbs.
+   - Lusaka: Strong coverage. Combined the main Lusaka Wikipedia article, an older/mirrored revision of that article (via a Wikipedia-content aggregator, primidi.com) listing ~65 named suburbs and compounds, individual Wikipedia articles for specific compounds (Kabwata, Kalingalinga, Matero, Garden Township), and an academic conference presentation on informal settlements in Lusaka by Patrick Lamson-Hall for the International Growth Centre (theigc.org), which independently named many of the same compounds (Kanyama, Chawama, Bauleni, Kalingalinga, Chazanga, John Laing, Mtendere, Ng'ombe, Chunga, Mandevu, etc.), giving strong cross-source corroboration. Excluded a handful of unverifiable fragments from the mirror page ('Kwa Shadreck", "Kwa George", "Ziwa Zakho", "Shang'ombo' [which duplicates the name of an unrelated Western Province district] and 'NIPA') as unverifiable/low-quality, and excluded 'Chilanga' because it is a separate district/town south of Lusaka, not a city compound. High confidence overall given the volume of independent corroboration; individual smaller informal compounds have lower confidence than the well-known named suburbs.
    - Kitwe: Reasonable coverage from the main Kitwe Wikipedia article, which explicitly lists the city's constituent townships/suburbs in one sentence, plus a separate mention of Kawama (site of a school construction project). This is a single-source list (no independent cross-check found), so treat as medium confidence, though the names are consistent with well-known Copperbelt mining-town township naming (Nkana East/West, Wusakile, Mindolo are historically documented ZCCM mine townships).
    - Ndola: Reasonable coverage, sourced entirely from the main Ndola, Zambia Wikipedia article, which lists 21 residential areas (several with attached schools, suggesting genuine local detail rather than a vandalism dump). No independent second source was found to cross-verify the full list, so confidence is medium; well-known names among them (Kansenshi, Chifubu, Northrise, Twapia) are independently attested in real-estate and news sources.
    - Kabwe: Reasonable coverage, but concentrated on lead-contamination-affected townships because Kabwe's documentation is dominated by lead-mining pollution research. Sourced from a Human Rights Watch report ('We Have to Be Worried', 2019) and a University of Zambia academic journal article (Journal of Agricultural and Biomedical Sciences) on soil lead contamination, both of which independently name overlapping townships (Makululu, Kasanda, Katondo, Chowa). High confidence for the townships listed; Kabwe likely has additional ordinary residential areas not covered by this pollution-focused literature, so the list should not be read as exhaustive.
    - Chingola: Thin coverage, as expected for a smaller Copperbelt town. Nchanga North confirmed via the main Chingola Wikipedia article (location of Nchanga Stadium); Chiwempala confirmed via multiple 2012-2026 news reports (Lusaka Times, News Diggers, Kalemba) describing riots/unrest there; Kasompe confirmed via Lusaka Times coverage of a 2022 demolition controversy and the existence of 'Kasompe Airport' on Wikipedia. No official council document was found listing all Chingola townships.
    - Mufulira: Thin coverage. The main Mufulira Wikipedia article names no residential areas at all. Kankoyo confirmed via its own Wikipedia article (a mine-adjacent township known for sulphur dioxide pollution); Kantanshi confirmed via the Wikipedia constituency article as covering central Mufulira; Kamuchanga confirmed as a named locality (police post) via Mapcarta. Low-to-medium confidence, short list reflects genuinely sparse available documentation rather than padding.
    - Livingstone: Reasonable coverage for a smaller city, anchored by an official UN-Habitat 'Zambia: Livingstone City Profile' document, which names six settlements formally recognized or targeted for upgrading by Livingstone City Council under the Housing (Statutory and Improvement Areas) Act (Mwandi, Nakatindi, Zambezi Sawmills, Malota, Libuyu, Sakubita) — a genuine official/planning source. Added Maramba (the historic African township, per the main Livingstone Wikipedia article), Linda (confirmed via the Wikipedia article for Linda Secondary School, located in Livingstone), and Dambwa (confirmed via an independent map listing of 'Dambwa Central Market'). Medium-to-high confidence given the official document.
-   - Chipata: Moderate coverage but lower confidence: sourced from an uncited bullet-list section in the main Chipata Wikipedia article naming 33-34 areas, including some colloquial/slang-sounding names (e.g. 'Little Bombay', 'Old Gym', 'Hollywood', 'Aslot', 'Gash') that could not be independently verified. Spot-checked several names against independent sources and found strong corroboration for the more notable ones: Kapata (a well-documented market area, confirmed via multiple independent sites including TripTap and Evendo), Msekera (a genuine agricultural research station location, confirmed via CGIAR/CIMMYT), and Gondar Barracks (a genuine Zambia Army barracks in Chipata, confirmed via Zambia Army social media posts). Given this partial independent verification, the full list was kept (one duplicate 'Hillview' entry in the source removed), but it should be treated as medium confidence overall since the underlying Wikipedia section itself is uncited.
-   - Kasama: Reasonable coverage, sourced from the main Kasama, Zambia Wikipedia article, which explicitly separates named residential compounds inside vs. outside the district council boundary. Partially cross-verified via an independent Facebook community post naming 'Central town, Chikumanino, New town, Location and Mulenga Hills' as Kasama suburbs, matching five of the Wikipedia entries. The remaining, more obscure compound names (e.g. 'Lua Luo', 'Soft Katongo', 'Winberg') could not be independently corroborated, so treat those as lower confidence than the core five.
+   - Chipata: Moderate coverage but lower confidence: sourced from an uncited bullet-list section in the main Chipata Wikipedia article naming 33-34 areas, including some colloquial/slang-sounding names (e.g. 'Little Bombay", "Old Gym", "Hollywood", "Aslot", "Gash') that could not be independently verified. Spot-checked several names against independent sources and found strong corroboration for the more notable ones: Kapata (a well-documented market area, confirmed via multiple independent sites including TripTap and Evendo), Msekera (a genuine agricultural research station location, confirmed via CGIAR/CIMMYT), and Gondar Barracks (a genuine Zambia Army barracks in Chipata, confirmed via Zambia Army social media posts). Given this partial independent verification, the full list was kept (one duplicate 'Hillview' entry in the source removed), but it should be treated as medium confidence overall since the underlying Wikipedia section itself is uncited.
+   - Kasama: Reasonable coverage, sourced from the main Kasama, Zambia Wikipedia article, which explicitly separates named residential compounds inside vs. outside the district council boundary. Partially cross-verified via an independent Facebook community post naming 'Central town, Chikumanino, New town, Location and Mulenga Hills' as Kasama suburbs, matching five of the Wikipedia entries. The remaining, more obscure compound names (e.g. 'Lua Luo", "Soft Katongo", "Winberg') could not be independently corroborated, so treat those as lower confidence than the core five.
    - Solwezi: Thin coverage, as expected for a smaller, newer mining town. Kansanshi and Kyawama confirmed via a Zambian real-estate firm's Solwezi area profile (Property Partners Zambia); Kimasala independently confirmed via Zambian government sources (Ministry of Infrastructure, Housing and Urban Development; Solwezi Municipal Council) referencing the 'Kimasala-Mushitala Bridge'; Kimiteto is from the same real-estate profile only and has lower confidence. Deliberately excluded 'Kalumbila' and 'Mutanda' from the same source, since these are separate towns/districts near Solwezi rather than Solwezi city compounds. No Wikipedia article or council document listing Solwezi's residential areas was found.
    - Choma: No sub-city area data found despite multiple search strategies (Wikipedia city/district/constituency articles, council site, news outlets, academic sources). The main Choma, Zambia Wikipedia article and Choma (constituency) article mention only landmarks (the museum, a market) and administrative boundaries, not named residential compounds/suburbs. Left empty rather than guessing or padding with unverified names.
 */
@@ -2197,7 +2206,7 @@ function referralUrlFor(isp, context){
   try{
     const url = new URL(cfg.url);
     if(cfg.code) url.searchParams.set("ref", cfg.code);
-    url.searchParams.set("utm_source", "zw-isp-tracker");
+    url.searchParams.set("utm_source", SITE_ID + "-isp-tracker");
     url.searchParams.set("utm_medium", "referral");
     url.searchParams.set("utm_campaign", context || "detail");
     return url.toString();
@@ -2590,14 +2599,15 @@ function renderList(){
       rateForm.dataset.city = citySelect.value;
       delete rateForm.dataset.area;
       if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(citySelect.value);
+      locStatus.textContent = citySelect.value ? "City set to "+citySelect.value : "";
+    });
+
     if(areaSelect){
       areaSelect.addEventListener("click", (e)=> e.stopPropagation());
       areaSelect.addEventListener("change",(e)=>{
         rateForm.dataset.area = areaSelect.value;
       });
     }
-      locStatus.textContent = citySelect.value ? "City set to "+citySelect.value : "";
-    });
 
     const commentBox = rowEl.querySelector('[data-role="commentBox"]');
     commentBox.addEventListener("click",(e)=> e.stopPropagation());
@@ -2694,14 +2704,15 @@ function renderList(){
       statusForm.dataset.city = statusCitySelect.value;
       delete statusForm.dataset.area;
       if(statusAreaSelect) statusAreaSelect.innerHTML = areaOptionsHtml(statusCitySelect.value);
+      statusLocStatus.textContent = statusCitySelect.value ? "City set to "+statusCitySelect.value : "";
+    });
+
     if(statusAreaSelect){
       statusAreaSelect.addEventListener("click", (e)=> e.stopPropagation());
       statusAreaSelect.addEventListener("change",(e)=>{
         statusForm.dataset.area = statusAreaSelect.value;
       });
     }
-      statusLocStatus.textContent = statusCitySelect.value ? "City set to "+statusCitySelect.value : "";
-    });
 
     const statusCommentBox = rowEl.querySelector('[data-role="statusCommentBox"]');
     statusCommentBox.addEventListener("click",(e)=> e.stopPropagation());
@@ -2764,14 +2775,15 @@ function renderList(){
       speedForm.dataset.city = speedCitySelect.value;
       delete speedForm.dataset.area;
       if(speedAreaSelect) speedAreaSelect.innerHTML = areaOptionsHtml(speedCitySelect.value);
+      speedLocStatus.textContent = speedCitySelect.value ? "City set to "+speedCitySelect.value : "";
+    });
+
     if(speedAreaSelect){
       speedAreaSelect.addEventListener("click", (e)=> e.stopPropagation());
       speedAreaSelect.addEventListener("change",(e)=>{
         speedForm.dataset.area = speedAreaSelect.value;
       });
     }
-      speedLocStatus.textContent = speedCitySelect.value ? "City set to "+speedCitySelect.value : "";
-    });
 
     const speedCommentBox = rowEl.querySelector('[data-role="speedCommentBox"]');
     speedCommentBox.addEventListener("click",(e)=> e.stopPropagation());
@@ -2848,26 +2860,49 @@ async function runAutoSpeedTest(rowEl, downInput, upInput, autoBtn, statusEl){
     }
   }
   autoBtn.disabled = true;
+  delete rowEl.dataset.speedExtra;   // never let a previous run's metrics ride along with this one
   if(statusEl) statusEl.textContent = t("speed_auto_running");
   try{
     const test = new window.__CFSpeedTest({
-      autoStart: true,
-      // A deliberately light measurement profile — this audience includes people on
-      // metered/expensive mobile data, so we favor "usually a few MB" over exhaustive
-      // accuracy. See SKILL.md for the reasoning and how to tune this.
+      autoStart: false,
+      // Don't POST each visitor's result to Cloudflare's own analytics endpoint.
+      logAimApiUrl: null,
+      // A deliberately light measurement profile (~4 MB) — this audience includes people on
+      // metered/expensive mobile data, so we favor "usually a few MB" over exhaustive accuracy.
+      // NO packetLoss step: it needs TURN credentials from speed.cloudflare.com/turn-creds, which
+      // only answers speed.cloudflare.com itself (CORS). From our origin it always failed, fired
+      // onError, and — because onError used to reject — threw away perfectly good download/upload
+      // results, so the automatic test "failed" for every visitor (found live 2026-09-23).
       measurements: [
         { type: "latency", numPackets: 1 },
+        { type: "download", bytes: 1e5, count: 1, bypassMinDuration: true },
         { type: "download", bytes: 1e6, count: 3 },
         { type: "latency", numPackets: 20 },
-        { type: "upload", bytes: 5e5, count: 3 },
-        { type: "packetLoss", numPackets: 500 }
+        { type: "upload", bytes: 1e5, count: 1, bypassMinDuration: true },
+        { type: "upload", bytes: 5e5, count: 3 }
       ]
     });
-    await new Promise((resolve, reject)=>{
-      test.onFinish = ()=>resolve();
-      test.onError = (err)=>reject(err);
+    const outcome = await new Promise((resolve)=>{
+      let done = false;
+      const finish = (ok, err)=>{ if(done) return; done = true; clearTimeout(timer); resolve({ ok, err }); };
+      const timer = setTimeout(()=>{ try{ test.pause(); }catch(e){} finish(false, "timeout"); }, 60000);
+      test.onFinish = ()=> finish(true);
+      // Fatal errors (latency/bandwidth) pause the engine; anything else is logged and the run continues.
+      test.onError = (err)=>{ console.warn("Speed test measurement error", err); if(!test.isRunning) finish(false, err); };
+      test.onResultsChange = ()=>{
+        try{
+          const p = test.results.getSummary();
+          if(statusEl && (p.download!=null || p.upload!=null)){
+            statusEl.textContent = t("speed_auto_progress")
+              .replace("{down}", p.download!=null ? (p.download/1e6).toFixed(1) : "…")
+              .replace("{up}", p.upload!=null ? (p.upload/1e6).toFixed(1) : "…");
+          }
+        }catch(e){}
+      };
+      test.play();
     });
     const s = test.results.getSummary();
+    if(s.download==null && s.upload==null) throw new Error(String(outcome.err || "no measurements"));
     const downloadMbps = s.download!=null ? s.download/1e6 : null;
     const uploadMbps = s.upload!=null ? s.upload/1e6 : null;
     if(downloadMbps!=null) downInput.value = downloadMbps.toFixed(1);
@@ -3047,8 +3082,18 @@ document.querySelectorAll(".lang-chip").forEach(chip=>{
     currentLang = chip.getAttribute("data-lang");
     try{ localStorage.setItem("zm_isp_lang", currentLang); }catch(e){}
     renderAll();
+    updateLiteLinks();
   });
 });
+
+/* Lite pages that exist for this site (generated by zwispqosp/tools/build_lite.py — keep in sync;
+   `build_lite.py --check` verifies it). Every "Lite version" link follows the chosen language. */
+const LITE_LANGS = ["ny"];
+function updateLiteLinks(){
+  const href = (currentLang !== "en" && LITE_LANGS.indexOf(currentLang) >= 0) ? "lite-" + currentLang + ".html" : "lite.html";
+  document.querySelectorAll('a[href^="lite"]').forEach(a=> a.setAttribute("href", href));
+}
+updateLiteLinks();
 
 document.getElementById("simpleModeToggle").addEventListener("click", ()=>{
   const btn = document.getElementById("simpleModeToggle");
@@ -3097,6 +3142,11 @@ document.getElementById("impactLocBtn").addEventListener("click", ()=>{
   }, {timeout:8000});
 });
 
+document.getElementById("impactCitySelect").addEventListener("change", ()=>{
+  const areaSelect = document.getElementById("impactAreaSelect");
+  if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(document.getElementById("impactCitySelect").value);
+});
+
 document.getElementById("impactToIsp").addEventListener("change", ()=>{
   document.getElementById("impactReferralCta").innerHTML = referralHtml(document.getElementById("impactToIsp").value, "switch_form");
 });
@@ -3123,11 +3173,6 @@ document.getElementById("impactPhone").addEventListener("input", ()=>{
 document.getElementById("impactSubmitBtn").addEventListener("click", ()=>{
   const toIsp = document.getElementById("impactToIsp").value;
   const fromIsp = document.getElementById("impactFromIsp").value || null;
-  document.getElementById("impactCitySelect").addEventListener("change", ()=>{
-  const areaSelect = document.getElementById("impactAreaSelect");
-  if(areaSelect) areaSelect.innerHTML = areaOptionsHtml(document.getElementById("impactCitySelect").value);
-});
-
   const city = document.getElementById("impactCitySelect").value || "Unknown";
   const comment = document.getElementById("impactComment").value.trim();
   const reasons = Array.from(document.querySelectorAll('[data-role="reasonCheck"]:checked')).map(el=>el.value);
