@@ -7,6 +7,12 @@ follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
 The version number shown here matches the `<meta name="app-version">` tag in
 `index.html` and the `v{version}` badge in the page's footer.
 
+## [1.4.2] — 2026-09-23
+
+### Added
+- "Rate by SMS" is back on every Lite page, now addressed to the real rating number `+260762061551`
+  (supplied by Ed); the Lite rating text mentions it again.
+
 ## [1.4.1] — 2026-09-23
 
 ### Fixed
